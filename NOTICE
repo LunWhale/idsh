@@ -1,0 +1,17 @@
+idsh bundles and links the following open-source projects:
+
+- iSH / ish-arm64 (https://github.com/ish-app/ish,
+  https://github.com/OpenMinis/ish-arm64) — GPL-3.0.
+  The userspace emulator and the ARM64 backend are distributed under GPL-3.0.
+- OpenMinis (https://github.com/OpenMinis/OpenMinis) — GPL-3.0.
+  Its iOS bridge, background keep-alive design and build scripts informed this port.
+- deepseek-harness-ios (https://github.com/liulingfei-1/deepseek-harness-ios) — GPL-3.0.
+  Used as the reference XCFramework build harness; see Docs/ROOTFS.md.
+- DeepSeek Harness (https://github.com/deepseek-ai/deepseek-harness) — MIT.
+  `dsh` itself is installed inside the guest rootfs at build time and is not
+  vendored in this repository.
+- Alpine Linux, Node.js, pnpm — their respective licenses.
+
+Because the shipped binary links GPL-3.0 components, the combined work is
+distributed under GPL-3.0. Corresponding source is this repository plus the
+pinned upstream revisions documented in Docs/ROOTFS.md.

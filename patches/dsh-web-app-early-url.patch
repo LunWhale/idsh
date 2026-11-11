@@ -1,0 +1,35 @@
+--- a/node_modules/@deepseek-ai/dsh-web-app/lib/index.js
++++ b/node_modules/@deepseek-ai/dsh-web-app/lib/index.js
+@@ -1,6 +1,7 @@
+ import { t as parsePublicUrl } from "./public-url-D_dMK-yI.js";
+ import { createRequire } from "node:module";
+ import { spawn } from "node:child_process";
++import { writeFileSync } from "node:fs";
+ import { dirname, join } from "node:path";
+ import z from "@deepseek-ai/schemastery";
+ import { auditStartupEntries } from "@deepseek-ai/dsh-app-boot";
+@@ -159,6 +160,7 @@
+ 			const webUrl = appRootUrl();
+ 			const authenticatedUrl = connectionCtx.connection.authenticatedUrl(webUrl);
+ 			ANNOUNCED_ROOTS.add(connectionCtx.root);
++			try { writeFileSync("/tmp/dsh.url", `${authenticatedUrl}\n`); } catch {}
+ 			if (config.printUrl) console.log(`dsh web: ${authenticatedUrl}`);
+ 			if (handoffBrowser) {
+ 				console.log("dsh web: opening the default browser; pass --no-open to disable");
+@@ -168,12 +170,10 @@
+ 				});
+ 			}
+ 		};
+-		const settled = connectionCtx.get("loader")?.await();
+-		if (settled === void 0) announceReady();
+-		else settled.then(async () => {
+-			await auditStartupEntries(connectionCtx.root, "dsh web", () => {});
+-			if (connectionCtx.get("webServer") !== void 0 && connectionCtx.get("connection") !== void 0) announceReady();
+-		}).catch(() => {});
++		const tryAnnounce = () => {
++			try { announceReady(); } catch { setTimeout(tryAnnounce, 500); }
++		};
++		tryAnnounce();
+ 	});
+ }
+ //#endregion

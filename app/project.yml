@@ -1,0 +1,101 @@
+name: idsh
+options:
+  bundleIdPrefix: com.brooks
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGNING_ALLOWED: NO
+    OTHER_LDFLAGS: "-lresolv -lsqlite3"
+targets:
+  idsh:
+    type: application
+    platform: iOS
+    settings:
+      base:
+        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": YES
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
+    sources:
+      - path: Sources
+      - path: Shared
+      - path: Resources
+        buildPhase: resources
+    entitlements:
+      path: idsh.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.brooks.idsh
+    dependencies:
+      - framework: Vendor/HarnessISH.xcframework
+        embed: true
+      - target: idsh-share
+        embed: true
+    info:
+      path: Info.plist
+      properties:
+        CFBundleDisplayName: idsh
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleURLTypes:
+          - CFBundleURLName: com.brooks.idsh
+            CFBundleURLSchemes:
+              - idsh
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        "UISupportedInterfaceOrientations~ipad":
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        UIRequiresFullScreen: false
+        UIFileSharingEnabled: true
+        LSSupportsOpeningDocumentsInPlace: true
+        NSSupportsLiveActivities: true
+        UIBackgroundModes:
+          - audio
+          - fetch
+          - processing
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.brooks.idsh.continued.*
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+          NSAllowsArbitraryLoads: false
+
+  idsh-share:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Shared
+      - path: ShareExtension
+    entitlements:
+      path: ShareExtension/ShareExtension.entitlements
+      properties:
+        com.apple.security.application-groups:
+          - group.com.brooks.idsh
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.brooks.idsh.share
+        CODE_SIGNING_ALLOWED: NO
+        "CODE_SIGNING_ALLOWED[sdk=iphonesimulator*]": YES
+        "CODE_SIGN_IDENTITY[sdk=iphonesimulator*]": "-"
+    info:
+      path: ShareExtension/Info.plist
+      properties:
+        CFBundleDisplayName: 发送到 idsh
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.share-services
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).ShareViewController
+          NSExtensionAttributes:
+            NSExtensionActivationRule:
+              NSExtensionActivationSupportsFileWithMaxCount: 20
+              NSExtensionActivationSupportsImageWithMaxCount: 20
+              NSExtensionActivationSupportsText: true

@@ -1,0 +1,18 @@
+# Local research checkouts and build caches
+.ref/
+.goal-gate/
+.DS_Store
+
+# Large generated artifacts (distributed via GitHub Releases)
+dist/
+app/Resources/alpine-rootfs.zip
+app/Vendor/HarnessISH.xcframework.prev-valve/
+*.xcarchive
+*.ipa
+*.ipa.zip
+
+# Xcode
+DerivedData/
+build/
+*.xcuserstate
+xcuserdata/
