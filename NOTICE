@@ -13,5 +13,5 @@ idsh bundles and links the following open-source projects:
 - Alpine Linux, Node.js, pnpm — their respective licenses.
 
 Because the shipped binary links GPL-3.0 components, the combined work is
-distributed under GPL-3.0. Corresponding source is this repository plus the
-pinned upstream revisions documented in Docs/ROOTFS.md.
+distributed under GPL-3.0. Corresponding source for our modifications is this repository; upstream sources
+and pinned revisions are listed in Docs/SOURCE.md.
