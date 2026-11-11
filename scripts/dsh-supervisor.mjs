@@ -101,6 +101,9 @@ async function start() {
       DSH_HOME: `${HOME}/.dsh`,
       DSH_PERMISSION_MODE: 'danger-full-access',
       DSH_TELEMETRY_DISABLED: '1',
+      // iSH's jitless Node cannot load undici's wasm llhttp parser. The
+      // streaming fetch polyfill over node:http is the supported path here.
+      DSH_FORCE_FETCH_POLYFILL: '1',
       PATH: `/usr/local/bin:/usr/bin:/bin`,
       NODE_COMPILE_CACHE: '/tmp/dsh-compile-cache',
     },

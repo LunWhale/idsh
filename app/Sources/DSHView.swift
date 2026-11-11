@@ -31,6 +31,13 @@ struct DSHView: View {
             .padding(.leading, 12)
             .accessibilityLabel("返回启动器")
         }
+        .overlay(alignment: .topTrailing) {
+            if model.showPerformanceHUD {
+                PerformanceHUDView()
+                    .padding(.top, 8)
+                    .padding(.trailing, 10)
+            }
+        }
         .statusBarHidden(false)
         .sheet(isPresented: $model.showShareComposer) {
             if let batch = model.pendingShare {

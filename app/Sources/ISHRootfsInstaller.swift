@@ -6,6 +6,23 @@ struct ISHRootfsInstallation: Sendable, Equatable {
     let installedNow: Bool
 }
 
+struct RootfsInstallProgress: Sendable {
+    let completedEntries: Int
+    let totalEntries: Int
+    let expandedBytes: Int64
+
+    var fraction: Double {
+        guard totalEntries > 0 else { return 0 }
+        return min(1, max(0, Double(completedEntries) / Double(totalEntries)))
+    }
+}
+
+private struct RootfsInstallState: Codable {
+    var version: String
+    var completedEntries: Int
+    var totalEntries: Int
+}
+
 enum ISHRootfsError: LocalizedError, Sendable {
     case archiveMissing
     case invalidArchive
@@ -73,7 +90,9 @@ actor ISHRootfsInstaller {
         return (try? isCurrentInstallation(at: installedRoot)) ?? false
     }
 
-    func installIfNeeded() throws -> ISHRootfsInstallation {
+    func installIfNeeded(
+        onProgress: (@Sendable (RootfsInstallProgress) -> Void)? = nil
+    ) throws -> ISHRootfsInstallation {
         let installedRoot = containerURL.appendingPathComponent(
             "alpine-rootfs",
             isDirectory: true
@@ -94,14 +113,25 @@ actor ISHRootfsInstaller {
             withIntermediateDirectories: true
         )
         let stagingRoot = containerURL.appendingPathComponent(
-            ".install-\(UUID().uuidString)",
+            ".install-current",
             isDirectory: true
         )
-        try fileManager.createDirectory(
-            at: stagingRoot,
-            withIntermediateDirectories: true
-        )
-        defer { try? fileManager.removeItem(at: stagingRoot) }
+        let stateURL = stagingRoot.appendingPathComponent(".install-state.json")
+
+        var state = loadState(at: stateURL)
+        if state?.version != Self.installationVersion
+            || !fileManager.fileExists(atPath: stagingRoot.path) {
+            try? fileManager.removeItem(at: stagingRoot)
+            try fileManager.createDirectory(
+                at: stagingRoot,
+                withIntermediateDirectories: true
+            )
+            state = RootfsInstallState(
+                version: Self.installationVersion,
+                completedEntries: 0,
+                totalEntries: 0
+            )
+        }
 
         let archive = try ISHZipArchive(url: archiveURL)
         guard archive.entries.count <= Self.maximumEntries,
@@ -110,9 +140,61 @@ actor ISHRootfsInstaller {
             throw ISHRootfsError.invalidArchive
         }
 
-        for entry in archive.entries {
+        let total = archive.entries.count
+        if state?.totalEntries != total {
+            state = RootfsInstallState(
+                version: Self.installationVersion,
+                completedEntries: 0,
+                totalEntries: total
+            )
+            try? fileManager.removeItem(at: stagingRoot)
+            try fileManager.createDirectory(
+                at: stagingRoot,
+                withIntermediateDirectories: true
+            )
+        }
+
+        // Replay a few entries that may have been written after the last
+        // persisted checkpoint. Writes are atomic, so duplicates are safe.
+        let firstIndex = max(0, (state?.completedEntries ?? 0) - 64)
+        var completed = firstIndex
+        var expandedBytes: Int64 = 0
+        var lastCheckpoint = Date.distantPast
+
+        if firstIndex > 0 {
+            for index in 0..<firstIndex {
+                expandedBytes += Int64(archive.entries[index].uncompressedSize)
+            }
+        }
+
+        func checkpoint(force: Bool) throws {
+            let now = Date()
+            guard force || now.timeIntervalSince(lastCheckpoint) > 0.5
+                || completed == total else { return }
+            lastCheckpoint = now
+            let snapshot = RootfsInstallState(
+                version: Self.installationVersion,
+                completedEntries: completed,
+                totalEntries: total
+            )
+            if let data = try? JSONEncoder().encode(snapshot) {
+                try? data.write(to: stateURL, options: .atomic)
+            }
+            onProgress?(RootfsInstallProgress(
+                completedEntries: completed,
+                totalEntries: total,
+                expandedBytes: expandedBytes
+            ))
+        }
+
+        for index in firstIndex..<total {
+            let entry = archive.entries[index]
             let relativePath = try safeRelativePath(for: entry.path)
-            guard !relativePath.isEmpty else { continue }
+            if relativePath.isEmpty {
+                completed = index + 1
+                try checkpoint(force: false)
+                continue
+            }
             let destination = stagingRoot
                 .appendingPathComponent(relativePath)
                 .standardizedFileURL
@@ -125,22 +207,27 @@ actor ISHRootfsInstaller {
                     at: destination,
                     withIntermediateDirectories: true
                 )
-                continue
-            }
-
-            try fileManager.createDirectory(
-                at: destination.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let data = try archive.extract(entry)
-            try data.write(to: destination, options: .atomic)
-            if let mode = entry.posixMode, mode & 0o111 != 0 {
-                try? fileManager.setAttributes(
-                    [.posixPermissions: NSNumber(value: mode & 0o777)],
-                    ofItemAtPath: destination.path
+            } else {
+                try fileManager.createDirectory(
+                    at: destination.deletingLastPathComponent(),
+                    withIntermediateDirectories: true
                 )
+                if !isUsableFile(destination, expectedSize: entry.uncompressedSize) {
+                    let data = try archive.extract(entry)
+                    try data.write(to: destination, options: .atomic)
+                    if let mode = entry.posixMode, mode & 0o111 != 0 {
+                        try? fileManager.setAttributes(
+                            [.posixPermissions: NSNumber(value: mode & 0o777)],
+                            ofItemAtPath: destination.path
+                        )
+                    }
+                }
             }
+            expandedBytes += Int64(entry.uncompressedSize)
+            completed = index + 1
+            try checkpoint(force: false)
         }
+        try checkpoint(force: true)
 
         guard try isStructurallyValid(at: stagingRoot) else {
             throw ISHRootfsError.invalidInstallation
@@ -166,11 +253,23 @@ actor ISHRootfsInstaller {
         } else {
             try fileManager.moveItem(at: stagingRoot, to: installedRoot)
         }
+        try? fileManager.removeItem(at: stateURL)
 
         guard try isCurrentInstallation(at: installedRoot) else {
             throw ISHRootfsError.invalidInstallation
         }
         return ISHRootfsInstallation(rootURL: installedRoot, installedNow: true)
+    }
+
+    private func loadState(at url: URL) -> RootfsInstallState? {
+        guard let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(RootfsInstallState.self, from: data)
+    }
+
+    private func isUsableFile(_ url: URL, expectedSize: Int) -> Bool {
+        guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .fileSizeKey]),
+              values.isRegularFile == true else { return false }
+        return values.fileSize == expectedSize
     }
 
     private func safeRelativePath(for archivePath: String) throws -> String {

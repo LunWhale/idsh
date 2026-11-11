@@ -2,6 +2,7 @@ import HarnessISH
 import Foundation
 import SwiftUI
 import UIKit
+import UserNotifications
 
 enum LauncherStatus: String, Equatable {
     case idle, extracting, booting, starting, ready, degraded, failed, stopped
@@ -29,6 +30,21 @@ final class LauncherModel: ObservableObject {
     @Published var headline = "准备启动"
     @Published var detail = "等待初始化"
     @Published var progress: Double = 0
+    @Published var bootStartedAt: Date?
+    @Published var showPerformanceHUD = UserDefaults.standard.bool(forKey: "idshPerformanceHUD")
+    @Published var showConfigEditor = false
+    @Published var configFile = LauncherModel.configFiles[0]
+    @Published var configText = ""
+    @Published var configStatus = ""
+    @Published var configLoading = false
+
+    static let configFiles = [
+        "cordis.patch.yml",
+        "cordis.yml",
+        "package.json",
+        "pnpm-workspace.yaml",
+        "dsh.profile.bundles.yml",
+    ]
     @Published var serverURL: URL?
     @Published var showDSH = false
     @Published var showTerminal = false
@@ -37,7 +53,9 @@ final class LauncherModel: ObservableObject {
     @Published var terminalCommand = ""
     @Published var audioKeepAlive = true
     @Published var continuedProcessing = true
+    @Published var backgroundBoot = UserDefaults.standard.object(forKey: "idshBackgroundBoot") as? Bool ?? true
     @Published var fastStartup = UserDefaults.standard.bool(forKey: "idshFastStartup")
+    @Published var backgroundBootArmed = false
     @Published var port = 8790
     @Published var rootfsPath = "—"
     @Published var pendingShare: ShareInbox.Batch?
@@ -61,6 +79,10 @@ final class LauncherModel: ObservableObject {
     private var pendingJS: String?
     private var webReadyObserver: NSObjectProtocol?
     private var evalResultObserver: NSObjectProtocol?
+    private var pendingAutoEnter = false
+    private var bootInProgress: Bool {
+        status == .extracting || status == .booting || status == .starting
+    }
 
     var portText: String { ":\(port)" }
 
@@ -175,16 +197,30 @@ final class LauncherModel: ObservableObject {
         status = .extracting
         headline = firstRun ? "首次启动" : "检查 rootfs"
         detail = firstRun
-            ? "首次启动需展开 Alpine 文件系统，约 2–3 分钟；之后启动约 1 分钟"
+            ? "首次启动需展开 Alpine 文件系统，约 2–3 分钟；可切到后台继续"
             : "正在准备 Alpine 文件系统"
+        progress = 0
+        bootStartedAt = Date()
+        armBackgroundBootIfNeeded()
+        // Notification permission is only requested when the user opts into
+        // background boot in Settings; never block first launch with a prompt.
         do {
-            let installation = try await installer.installIfNeeded()
+            let installation = try await installer.installIfNeeded { progressInfo in
+                Task { @MainActor [weak self] in
+                    guard let self else { return }
+                    self.progress = min(0.5, progressInfo.fraction * 0.5)
+                    self.headline = "解压 rootfs"
+                    self.detail = "已完成 \(progressInfo.completedEntries)/\(progressInfo.totalEntries) 个文件"
+                    self.updateBackgroundBootProgress()
+                }
+            }
             rootURL = installation.rootURL
             rootfsPath = installation.rootURL.lastPathComponent
-            progress = 0.5
+            progress = 0.55
             status = .booting
             headline = "启动 Linux"
             detail = "挂载 fakefs、初始化 PID 1"
+            updateBackgroundBootProgress()
             let rc = ISHKernel.shared.boot(withRootPath: installation.rootURL.path)
             guard rc >= 0 else {
                 fail("iSH boot 失败：\(rc)")
@@ -195,6 +231,8 @@ final class LauncherModel: ObservableObject {
             status = .starting
             headline = "启动 DSH"
             detail = "Node supervisor 正在拉起 dsh web"
+            progress = 0.6
+            updateBackgroundBootProgress()
             for name in ["dsh.url", "dsh.state"] {
                 try? FileManager.default.removeItem(
                     at: installation.rootURL.appendingPathComponent("data/tmp/\(name)")
@@ -250,8 +288,11 @@ final class LauncherModel: ObservableObject {
         pollingTask?.cancel()
         pollingTask = Task { [weak self] in
             guard let self else { return }
-            for _ in 0..<420 {
+            for tick in 0..<420 {
                 if Task.isCancelled { return }
+                if self.status == .starting {
+                    self.progress = max(self.progress, 0.6 + min(0.3, Double(tick) / 420.0 * 0.3))
+                }
                 if let root = self.rootURL {
                     let file = root.appendingPathComponent("data/tmp/dsh.url")
                     let stateFile = root.appendingPathComponent("data/tmp/dsh.state")
@@ -267,7 +308,22 @@ final class LauncherModel: ObservableObject {
                         self.progress = 1
                         self.headline = "DSH 已就绪"
                         self.detail = "\(url.host ?? "127.0.0.1"):\(self.port) · token 已就绪" + (self.fastStartup ? " · 极简模式" : "")
-                        self.showDSH = true
+                        self.backgroundBootArmed = false
+                        BackgroundKeeper.shared.finishContinued(success: true)
+                        BackgroundKeeper.shared.endBackgroundExecution()
+                        if ProcessInfo.processInfo.arguments.contains("--open-config") {
+                            self.showConfigEditor = true
+                            self.showDSH = false
+                        } else if UIApplication.shared.applicationState == .active {
+                            self.showDSH = true
+                            self.pendingAutoEnter = false
+                        } else {
+                            // Creating the WebView while suspended wastes the
+                            // memory budget that the guest still needs. Enter on
+                            // the next foreground instead.
+                            self.pendingAutoEnter = true
+                            self.notifyReadyIfNeeded()
+                        }
                         self.presentQueuedShareIfNeeded()
                         return
                     }
@@ -283,11 +339,161 @@ final class LauncherModel: ObservableObject {
         headline = "启动失败"
         detail = message
         progress = 0
+        backgroundBootArmed = false
+        BackgroundKeeper.shared.finishContinued(success: false)
+        BackgroundKeeper.shared.endBackgroundExecution()
+    }
+
+    // MARK: - Background boot
+
+    /// Called while the app is still foregrounded. Submits the iOS 26
+    /// continued-processing request so the user can leave immediately.
+    func prepareBackgroundBoot() {
+        guard bootInProgress else { return }
+        backgroundBootArmed = true
+        // Notification permission is only requested when the user opts into
+        // background boot in Settings; never block first launch with a prompt.
+        BackgroundKeeper.shared.startAudio()
+        BackgroundKeeper.shared.beginBackgroundExecution()
+        BackgroundKeeper.shared.submitContinued(
+            title: "idsh 正在准备",
+            subtitle: detail,
+            progress: progress
+        )
+        shareNotice = "已开启后台准备，可以切到其他 App；完成后会通知你"
+        updateBackgroundBootProgress()
+    }
+
+    private func armBackgroundBootIfNeeded() {
+        guard backgroundBoot, bootInProgress else { return }
+        backgroundBootArmed = true
+    }
+
+    private func updateBackgroundBootProgress() {
+        guard backgroundBootArmed else { return }
+        BackgroundKeeper.shared.updateContinued(
+            title: "idsh 正在准备",
+            subtitle: detail,
+            progress: progress
+        )
+    }
+
+    private func requestNotificationPermissionIfNeeded() {
+        guard UserDefaults.standard.bool(forKey: "idshNotificationAsked") == false else { return }
+        UserDefaults.standard.set(true, forKey: "idshNotificationAsked")
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { granted, error in
+            NSLog("idsh notification permission granted=\(granted) error=\(error?.localizedDescription ?? "nil")")
+        }
+    }
+
+    private func notifyReadyIfNeeded() {
+        guard UIApplication.shared.applicationState != .active else { return }
+        let content = UNMutableNotificationContent()
+        content.title = "idsh 已就绪"
+        content.body = "DSH 已在后台启动完成，点按进入。"
+        content.sound = .default
+        let request = UNNotificationRequest(
+            identifier: "idsh.ready",
+            content: content,
+            trigger: nil
+        )
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error { NSLog("idsh ready notification failed: \(error.localizedDescription)") }
+        }
+    }
+
+    func setBackgroundBoot(_ enabled: Bool) {
+        backgroundBoot = enabled
+        UserDefaults.standard.set(enabled, forKey: "idshBackgroundBoot")
+        if enabled { requestNotificationPermissionIfNeeded() }
     }
 
     func enterDSH() {
         guard serverURL != nil else { return }
         showDSH = true
+    }
+
+    func setPerformanceHUD(_ enabled: Bool) {
+        showPerformanceHUD = enabled
+        UserDefaults.standard.set(enabled, forKey: "idshPerformanceHUD")
+    }
+
+    // MARK: - Config editor (guest-side, fakefs-aware)
+
+    private var profileDir: String { "/root/.dsh/profiles/web" }
+
+    func loadConfigFile() {
+        guard status == .ready else {
+            configStatus = "DSH 未就绪，无法读取 guest 文件"
+            return
+        }
+        guard !configLoading else { return }
+        configLoading = true
+        configStatus = "读取 \(configFile)…"
+        let path = "\(profileDir)/\(configFile)"
+        let quoted = "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        var output = ""
+        DispatchQueue.main.async {
+            _ = ISHShellExecutor.executeCommand(
+                "/bin/base64 -w0 \(quoted)",
+                lineCallback: { line, _ in
+                    output += line
+                },
+                completion: { [weak self] result in
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.configLoading = false
+                        if result.exitCode == 0, let data = Data(base64Encoded: output),
+                           let text = String(data: data, encoding: .utf8) {
+                            self.configText = text
+                            self.configStatus = "已载入 \(text.count) 字符"
+                        } else {
+                            self.configText = ""
+                            self.configStatus = "读取失败（exit=\(result.exitCode)）"
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    func saveConfigFileAndRestart() {
+        guard status == .ready else {
+            configStatus = "DSH 未就绪，无法写入 guest 文件"
+            return
+        }
+        guard !configLoading else { return }
+        configLoading = true
+        configStatus = "写入 \(configFile)…"
+        let path = "\(profileDir)/\(configFile)"
+        let quoted = "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+        let base64 = Data(configText.utf8).base64EncodedString()
+        let command = "printf '%s' '\(base64)' | /bin/base64 -d > \(quoted)"
+        DispatchQueue.main.async {
+            _ = ISHShellExecutor.executeCommand(
+                command,
+                lineCallback: { _, _ in },
+                completion: { [weak self] result in
+                    Task { @MainActor in
+                        guard let self else { return }
+                        self.configLoading = false
+                        if result.exitCode == 0 {
+                            self.configStatus = "已保存，正在重启 DSH…"
+                            self.showConfigEditor = false
+                            self.restartDSH()
+                        } else {
+                            self.configStatus = "保存失败（exit=\(result.exitCode)）"
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    var elapsedText: String {
+        guard let start = bootStartedAt else { return "" }
+        let seconds = max(0, Int(Date().timeIntervalSince(start)))
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 
     /// The minimal startup layer is a different `dsh web` invocation, so it
@@ -316,7 +522,22 @@ final class LauncherModel: ObservableObject {
 
     /// Cold-start / foreground hook for `idsh://share/<batch-id>`.
     func handleOpenURL(_ url: URL) {
-        guard url.scheme == "idsh", url.host == "share" else { return }
+        guard url.scheme == "idsh" else { return }
+        switch url.host {
+        case "config":
+            showConfigEditor = true
+            return
+        case "settings":
+            showSettings = true
+            return
+        case "hud":
+            setPerformanceHUD(!showPerformanceHUD)
+            return
+        case "share":
+            break
+        default:
+            return
+        }
         let id = url.lastPathComponent
         guard let batch = ShareInbox.loadBatches().first(where: { $0.id == id }) else {
             shareNotice = "分享批次已失效"
@@ -580,19 +801,53 @@ final class LauncherModel: ObservableObject {
         switch phase {
         case .background:
             if audioKeepAlive { BackgroundKeeper.shared.startAudio() }
-            if continuedProcessing { BackgroundKeeper.shared.submitContinued() }
-            // Hold trace pressure before the process is suspended: with the
-            // engine's idle valves removed, the guest is not killed while the
-            // host process survives, but iOS still throttles a background app
-            // hard. A 55% duty cycle keeps the event loop responsive without
-            // looking like a runaway CPU consumer.
-            ISHKernel.shared.enableCPUThrottle(withDutyCycle: 0.55)
+            if bootInProgress && backgroundBoot {
+                backgroundBootArmed = true
+                BackgroundKeeper.shared.beginBackgroundExecution()
+                BackgroundKeeper.shared.submitContinued(
+                    title: "idsh 正在准备",
+                    subtitle: detail,
+                    progress: progress
+                )
+            }
+            // Do not throttle during boot: iOS already backgrounds us, and
+            // halving the interpreter's duty cycle can triple startup time.
+            // Once DSH is up, a 55% duty cycle keeps the event loop responsive
+            // without looking like a runaway CPU consumer.
+            if status == .ready {
+                ISHKernel.shared.enableCPUThrottle(withDutyCycle: 0.55)
+            } else {
+                ISHKernel.shared.disableCPUThrottle()
+            }
         case .inactive:
             if audioKeepAlive { BackgroundKeeper.shared.startAudio() }
+            if bootInProgress && backgroundBoot {
+                // `inactive` still counts as foreground for the scheduler and
+                // is the last reliable moment to submit the request.
+                backgroundBootArmed = true
+                BackgroundKeeper.shared.beginBackgroundExecution()
+                BackgroundKeeper.shared.submitContinued(
+                    title: "idsh 正在准备",
+                    subtitle: detail,
+                    progress: progress
+                )
+            }
         case .active:
             ISHKernel.shared.disableCPUThrottle()
             if audioKeepAlive { BackgroundKeeper.shared.startAudio() }
             else { BackgroundKeeper.shared.stopAudio() }
+            BackgroundKeeper.shared.endBackgroundExecution()
+            if pendingAutoEnter && serverURL != nil {
+                pendingAutoEnter = false
+                showDSH = true
+            }
+            if bootInProgress && backgroundBootArmed {
+                BackgroundKeeper.shared.submitContinued(
+                    title: "idsh 正在准备",
+                    subtitle: detail,
+                    progress: progress
+                )
+            }
         default:
             break
         }

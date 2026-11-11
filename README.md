@@ -16,6 +16,8 @@
 
 `idsh` 把完整的 DeepSeek Harness 装进 iPad：iSH ARM64 用户态 Linux + 常驻 `dsh web` + WKWebView。它不是远程串流，也不是精简版客户端——浏览器里加载的就是桌面版 DSH 的同一套前端，iPad 上得到三栏桌面布局。
 
+> ⚠️ **加载速度极慢。** 首次启动要解压约 1.1 GB 的 Alpine rootfs（2–3 分钟）；之后冷启动仍要 50–80 秒，极简模式约 69–77 秒。这不是 bug，是 iSH 解释执行 + DSH 0.2.2 约 95 个 Cordis 插件的固有成本。
+
 ### 已实现
 
 - **iPad 与 PC 同款 UI**：WKWebView 直接加载 `dsh-web-frontend`，三栏、侧栏、终端面板都保留。
@@ -24,6 +26,9 @@
 - **分享面板**：iOS 分享 → App Group → `/workspace/inbox/<id>` → 预填 DSH 输入框；DSH 未启动时排队。
 - **DSH 更新**：设置页检查 npm 最新版，并可执行 `dsh-update` 后重启。
 - **启动模式**：完整 / 极简 · 快，启动器与设置页可切换。
+- **后台准备 / 断点续解压**：启动期间可切到其他 App；解压按块记录进度，中断后从断点继续。
+- **性能 HUD**：右上角浮层显示 FPS、内存、热状态与电量；设置页可开关。
+- **配置文件编辑器**：在 App 内直接编辑 `/root/.dsh/profiles/web` 下的配置并重启 DSH，替代桌面版“打开配置文件”入口。
 - **登录**：DSH Web 宿主不提供交互式 OAuth 回调，账号登录会返回 `protocol` 错误；请用 API Key（设置页有说明）。
 
 ### 快速开始
@@ -89,6 +94,7 @@ Docs/ISH-ENGINE-VALVES.md    引擎问题与修复记录
 
 - 只支持纯 JS / npm 插件；iOS 上无法加载 `.node` 原生 addon（node-pty、sherpa、libreoffice 等），Office 文档转换在 `--jitless` 下也不可用。
 - 冷启动仍是 50–80 秒：DSH 0.2.2 有约 95 个 Cordis 插件，iSH 是解释执行；极简模式只能省约 20%。
+- DSH 设置页的「打开配置文件」是桌面宿主专用操作，在 Web 宿主会报错；请用启动器「设置 → 配置文件」或直接添加模型提供商。添加模型不需要编辑配置文件。
 - iPhone 只做可用性适配，不重排桌面布局；主要目标是 iPad。
 - OAuth 登录不可用；API Key 是唯一方式。
 - 未签名 IPA 需自签；免费证书 7 天有效。
@@ -107,6 +113,8 @@ GPL-3.0。原因：链接了 iSH / ish-arm64 / OpenMinis 的 GPL 代码。第三
 
 `idsh` puts the full DeepSeek Harness on an iPad: an iSH ARM64 user-mode Linux, a long-running `dsh web`, and a WKWebView. It is not remote streaming and not a cut-down client — the WebView loads the same frontend as the desktop app, so the iPad gets the real three-column layout.
 
+> ⚠️ **Startup is extremely slow.** The first launch extracts a ~1.1 GB Alpine rootfs (2–3 min); later cold starts still take 50–80 s, or 69–77 s in minimal mode. This is not a bug: iSH interprets every instruction, and DSH 0.2.2 loads about 95 Cordis plugins.
+
 ### What works
 
 - **Desktop UI on iPad**: WKWebView loads `dsh-web-frontend` unchanged.
@@ -115,6 +123,9 @@ GPL-3.0。原因：链接了 iSH / ish-arm64 / OpenMinis 的 GPL 代码。第三
 - **Share sheet**: iOS share → App Group → `/workspace/inbox/<id>` → prefilled DSH composer; queued when DSH is not running.
 - **DSH updates**: the settings page checks npm and can run `dsh-update` then restart.
 - **Startup modes**: Full / Minimal-Fast, switchable from the launcher and settings.
+- **Background preparation / resumable extraction**: leave the app while it prepares; extraction checkpoints and resumes after interruption.
+- **Performance HUD**: top-right FPS / memory / thermal / battery overlay; toggle in settings.
+- **Config editor**: edit files under `/root/.dsh/profiles/web` in-app and restart DSH — replaces the desktop-only "open configuration file" entry.
 - **Sign-in**: the DSH web host has no interactive OAuth callback and returns `protocol`; use an API key instead.
 
 ### Quick start
@@ -178,6 +189,7 @@ Docs/ISH-ENGINE-VALVES.md    engine findings and fixes
 
 - Pure-JS/npm plugins only; `.node` native addons cannot load on iOS (node-pty, sherpa, libreoffice). Office conversion is also unavailable under `--jitless`.
 - Cold start is 50–80 s: DSH 0.2.2 loads ~95 Cordis plugins and iSH is an interpreter; minimal mode saves about 20%.
+- DSH's "open configuration file" is a desktop-host-only action and fails in the web host. Use the launcher's Settings → Configuration instead; adding a model provider does not require editing files.
 - iPhone is best-effort; the desktop layout is not reflowed. iPad is the target.
 - OAuth sign-in is unavailable; API key only.
 - The IPA is unsigned and must be sideloaded; free certificates expire after 7 days.

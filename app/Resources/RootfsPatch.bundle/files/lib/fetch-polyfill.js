@@ -223,6 +223,10 @@ if (typeof globalThis.WebAssembly === "undefined" ||
         return f;
       },
       set(v) {
+        // In forced mode Node's bootstrap (or undici) may assign its own fetch
+        // after --require. Keep our streaming implementation instead; the whole
+        // point of forcing the polyfill is that undici's llhttp cannot load.
+        if (process.env.DSH_FORCE_FETCH_POLYFILL === "1") return;
         Object.defineProperty(globalThis, "fetch", { value: v, writable: true, configurable: true });
       },
     });

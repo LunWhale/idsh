@@ -1,8 +1,12 @@
 # idsh 构建与侧载说明
 
+## v0.1.1（2026-11-11）
+
+新增：启动进度条、性能 HUD、App 内配置文件编辑器、启动期间后台准备与断点续解压、强制流式 fetch polyfill（修 undici/WebAssembly 导致的 API 断流）。
+
 ## 产物
 
-- `dist/idsh-unsigned.ipa`（约 341 MB，未签名，sha256 `8a88b623dc0bacb8f6e9d06e847044bf1cec33fd6dedccf5c23e8d0e45d0a9c5`）
+- `dist/idsh-unsigned.ipa`（约 341 MB，未签名，sha256 `3da75e63e9fcc08230e2f60af48989656e601d71eedf46c800cd39c8b1f58451`）
 - 构建脚本：`scripts/make-ipa.sh`
 - 目标：iPad Pro 11-inch (M4)，最低 iOS 18.0；已在 iPadOS 26.3 模拟器验证
 

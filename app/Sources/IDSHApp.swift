@@ -56,11 +56,21 @@ struct RootView: View {
         .sheet(isPresented: $model.showSettings) {
             SettingsView().environmentObject(model)
         }
+        .sheet(isPresented: $model.showConfigEditor) {
+            DSHConfigEditorView().environmentObject(model)
+        }
         .onOpenURL { url in
             model.handleOpenURL(url)
         }
         .onChange(of: scenePhase) { _, phase in
             model.scenePhaseChanged(phase)
+        }
+        .overlay(alignment: .topTrailing) {
+            if model.showPerformanceHUD {
+                PerformanceHUDView()
+                    .padding(.top, 8)
+                    .padding(.trailing, 10)
+            }
         }
         .overlay(alignment: .bottom) {
             if let notice = model.shareNotice {
@@ -109,10 +119,29 @@ struct LauncherView: View {
                 Text(model.headline).font(.system(size: 17, weight: .semibold))
                 Text(model.detail).font(.system(size: 13, design: .monospaced))
                     .foregroundStyle(Color(white: 0.55))
-                if model.status == .starting || model.status == .extracting {
-                    ProgressView(value: model.progress)
-                        .tint(Color(red: 0.82, green: 0.62, blue: 0.18))
-                        .padding(.top, 6)
+                if model.status != .ready && model.status != .failed && model.status != .stopped {
+                    TimelineView(.periodic(from: .now, by: 1)) { _ in
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 8) {
+                                Text(progressTitle)
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(Color(white: 0.5))
+                                Spacer()
+                                Text("\(model.elapsedText) · \(Int(model.progress * 100))%")
+                                    .font(.system(size: 10, design: .monospaced))
+                                    .foregroundStyle(Color(white: 0.42))
+                            }
+                            ProgressView(value: model.progress)
+                                .tint(Color(red: 0.82, green: 0.62, blue: 0.18))
+                            HStack(spacing: 10) {
+                                phaseDot("解压", model.status == .extracting)
+                                phaseDot("Linux", model.status == .booting)
+                                phaseDot("DSH", model.status == .starting)
+                                phaseDot("就绪", model.status == .ready)
+                            }
+                        }
+                    }
+                    .padding(.top, 6)
                 }
             }
             .padding(18)
@@ -178,6 +207,26 @@ struct LauncherView: View {
         .frame(maxWidth: 720)
         .frame(maxWidth: .infinity)
         .foregroundStyle(.white)
+    }
+
+    private var progressTitle: String {
+        switch model.status {
+        case .extracting: return "展开 Alpine 文件系统"
+        case .booting: return "启动 Linux 内核"
+        case .starting: return "加载 Cordis 插件 / DSH"
+        default: return "准备中"
+        }
+    }
+
+    private func phaseDot(_ label: String, _ active: Bool) -> some View {
+        HStack(spacing: 4) {
+            Circle()
+                .fill(active ? Color(red: 0.82, green: 0.62, blue: 0.18) : Color(white: 0.2))
+                .frame(width: 5, height: 5)
+            Text(label)
+                .font(.system(size: 9, design: .monospaced))
+                .foregroundStyle(active ? Color(white: 0.7) : Color(white: 0.32))
+        }
     }
 }
 
@@ -258,7 +307,25 @@ struct SettingsView: View {
                 Section("后台") {
                     Toggle("音频保活", isOn: $model.audioKeepAlive)
                     Toggle("iOS 26 持续处理", isOn: $model.continuedProcessing)
-                    Text("DSH 常驻在 iSH 中；后台 CPU governor 由原生控制。").font(.footnote).foregroundStyle(.secondary)
+                    Toggle("启动期间允许切后台", isOn: Binding(
+                        get: { model.backgroundBoot },
+                        set: { model.setBackgroundBoot($0) }
+                    ))
+                    Text("开启后可在解压/启动期间切到其他 App；iOS 26 会显示持续处理卡片，iOS 18 依靠音频保活。DSH 常驻在 iSH 中，后台 CPU governor 由原生控制。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Section("配置文件") {
+                    Button("编辑 DSH 配置文件") { model.showConfigEditor = true }
+                    Text("在 guest 内直接编辑 /root/.dsh/profiles/web 下的文件；保存后重启 DSH 生效。桌面版的“打开配置文件”按钮在 Web 宿主不可用，这里替代它。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Section("调试") {
+                    Toggle("性能 HUD（右上角）", isOn: Binding(
+                        get: { model.showPerformanceHUD },
+                        set: { model.setPerformanceHUD($0) }
+                    ))
+                    Text("显示 FPS、App CPU、RSS、热状态与电量；点按 HUD 可展开/收起。")
+                        .font(.footnote).foregroundStyle(.secondary)
                 }
                 Section("DeepSeek 账号") {
                     Text("DSH Web 宿主不提供交互式登录回调，点“登录”会返回 protocol 错误。请在 DSH 内用 API Key 连接。")

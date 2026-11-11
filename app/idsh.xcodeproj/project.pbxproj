@@ -16,12 +16,14 @@
 		67FCAF18EB676C9A57D852A3 /* STHeitiSC-Medium.woff2 in Resources */ = {isa = PBXBuildFile; fileRef = 46FF6ED8F711BF4E4CF3E1FE /* STHeitiSC-Medium.woff2 */; };
 		6EB70A36172395CE94575C63 /* ShareViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D7CB7B393116642039F39B8 /* ShareViewController.swift */; };
 		86C71DE597B209515B8CFF0A /* HarnessISH.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 08071BD30E602891E32073C7 /* HarnessISH.xcframework */; };
+		87EA722CC6D0B522F729A573 /* PerformanceHUD.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D3A1AD228F1A7CD070D22F4 /* PerformanceHUD.swift */; };
 		94A475880DFD20833133D0F6 /* RootfsPatch.bundle in Resources */ = {isa = PBXBuildFile; fileRef = 290F4C0F4E5A65CCAA117526 /* RootfsPatch.bundle */; };
 		9F903B0BF02E972359AACF67 /* TerminalConsole.swift in Sources */ = {isa = PBXBuildFile; fileRef = 95F0E98022E7AE6EA945B6E7 /* TerminalConsole.swift */; };
 		A9A4591A5A42A19A7E794CA1 /* HarnessISH.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 08071BD30E602891E32073C7 /* HarnessISH.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AD43ECB5FBF255103D5D8610 /* LauncherModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 440681C5553990A664604454 /* LauncherModel.swift */; };
 		AD805A71DA1171BC14F07325 /* ShareInbox.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5859637EE5C036201CB93023 /* ShareInbox.swift */; };
 		CAB39F3CBA2C3EA2ADB1B58B /* ShareComposerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B6CF33FDF4226FE82DC20039 /* ShareComposerView.swift */; };
+		D88426BEA23351F2F3CAE53E /* DSHConfigEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 810F75ABF9408D5EAD959BA7 /* DSHConfigEditorView.swift */; };
 		FAE2AACE5C97E1E81A6B7671 /* alpine-rootfs.zip in Resources */ = {isa = PBXBuildFile; fileRef = 60CE33F63CEC62E54D9546A3 /* alpine-rootfs.zip */; };
 /* End PBXBuildFile section */
 
@@ -71,7 +73,9 @@
 		5859637EE5C036201CB93023 /* ShareInbox.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareInbox.swift; sourceTree = "<group>"; };
 		60CE33F63CEC62E54D9546A3 /* alpine-rootfs.zip */ = {isa = PBXFileReference; lastKnownFileType = archive.zip; path = "alpine-rootfs.zip"; sourceTree = "<group>"; };
 		6D7CB7B393116642039F39B8 /* ShareViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareViewController.swift; sourceTree = "<group>"; };
+		810F75ABF9408D5EAD959BA7 /* DSHConfigEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSHConfigEditorView.swift; sourceTree = "<group>"; };
 		95F0E98022E7AE6EA945B6E7 /* TerminalConsole.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalConsole.swift; sourceTree = "<group>"; };
+		9D3A1AD228F1A7CD070D22F4 /* PerformanceHUD.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformanceHUD.swift; sourceTree = "<group>"; };
 		9EC1FEBABF6ACAEEB698E23D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		B6CF33FDF4226FE82DC20039 /* ShareComposerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShareComposerView.swift; sourceTree = "<group>"; };
 		E45B97A4D581258E87767A2D /* DSHView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DSHView.swift; sourceTree = "<group>"; };
@@ -106,10 +110,12 @@
 			isa = PBXGroup;
 			children = (
 				0B925929F7D5BD9EECF1F8CF /* BackgroundKeeper.swift */,
+				810F75ABF9408D5EAD959BA7 /* DSHConfigEditorView.swift */,
 				E45B97A4D581258E87767A2D /* DSHView.swift */,
 				F004CD854FC65B364A95E2F8 /* IDSHApp.swift */,
 				0391BE0F215750C904E4B354 /* ISHRootfsInstaller.swift */,
 				440681C5553990A664604454 /* LauncherModel.swift */,
+				9D3A1AD228F1A7CD070D22F4 /* PerformanceHUD.swift */,
 				B6CF33FDF4226FE82DC20039 /* ShareComposerView.swift */,
 				95F0E98022E7AE6EA945B6E7 /* TerminalConsole.swift */,
 			);
@@ -263,10 +269,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				36C8CFD2FA42C20B4A4D93C3 /* BackgroundKeeper.swift in Sources */,
+				D88426BEA23351F2F3CAE53E /* DSHConfigEditorView.swift in Sources */,
 				2292A1C26A517A1E8FF3B062 /* DSHView.swift in Sources */,
 				37668E368F9D74AD675E503E /* IDSHApp.swift in Sources */,
 				2B9AC233185283B4B5312610 /* ISHRootfsInstaller.swift in Sources */,
 				AD43ECB5FBF255103D5D8610 /* LauncherModel.swift in Sources */,
+				87EA722CC6D0B522F729A573 /* PerformanceHUD.swift in Sources */,
 				CAB39F3CBA2C3EA2ADB1B58B /* ShareComposerView.swift in Sources */,
 				1014B18A5C24C388617AB982 /* ShareInbox.swift in Sources */,
 				9F903B0BF02E972359AACF67 /* TerminalConsole.swift in Sources */,
