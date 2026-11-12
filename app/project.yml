@@ -38,7 +38,7 @@ targets:
       path: Info.plist
       properties:
         CFBundleDisplayName: idsh
-        CFBundleShortVersionString: "0.1.1"
+        CFBundleShortVersionString: "0.1.2"
         CFBundleURLTypes:
           - CFBundleURLName: com.brooks.idsh
             CFBundleURLSchemes:

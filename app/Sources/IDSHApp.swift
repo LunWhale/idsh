@@ -56,7 +56,10 @@ struct RootView: View {
         .sheet(isPresented: $model.showSettings) {
             SettingsView().environmentObject(model)
         }
-        .sheet(isPresented: $model.showConfigEditor) {
+        .sheet(isPresented: Binding(
+            get: { model.showConfigEditor && !model.showDSH },
+            set: { presented in if !presented { model.showConfigEditor = false } }
+        )) {
             DSHConfigEditorView().environmentObject(model)
         }
         .onOpenURL { url in

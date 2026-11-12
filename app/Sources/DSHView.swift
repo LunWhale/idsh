@@ -44,6 +44,19 @@ struct DSHView: View {
                 ShareComposerView(batch: batch).environmentObject(model)
             }
         }
+        .sheet(isPresented: $model.showConfigEditor) {
+            DSHConfigEditorView().environmentObject(model)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .idshOpenConfig)) { _ in
+            NSLog("idsh opening config editor")
+            // The full-screen DSH cover cannot reliably present a second sheet;
+            // return to the launcher (the guest keeps running) and let the
+            // root view present the editor.
+            model.showDSH = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) {
+                model.showConfigEditor = true
+            }
+        }
     }
 }
 
@@ -54,6 +67,8 @@ extension Notification.Name {
     static let idshWebReady = Notification.Name("idsh.web.ready")
     /// Posted with the stringified result of an evaluated snippet.
     static let idshEvalResult = Notification.Name("idsh.eval.result")
+    /// Posted when the web UI asks for the native configuration editor.
+    static let idshOpenConfig = Notification.Name("idsh.open.config")
 }
 
 struct DSHWebContainer: UIViewRepresentable {
@@ -73,6 +88,9 @@ struct DSHWebContainer: UIViewRepresentable {
                                               injectionTime: .atDocumentStart,
                                               forMainFrameOnly: false))
         controller.addUserScript(WKUserScript(source: Self.fontScript,
+                                              injectionTime: .atDocumentStart,
+                                              forMainFrameOnly: false))
+        controller.addUserScript(WKUserScript(source: Self.configBridgeScript,
                                               injectionTime: .atDocumentStart,
                                               forMainFrameOnly: false))
         config.userContentController = controller
@@ -120,6 +138,31 @@ struct DSHWebContainer: UIViewRepresentable {
       scan(document);
       window.addEventListener('load', function(){ scan(document); });
       setTimeout(function(){ scan(document); }, 1500);
+    })();
+    """
+
+    /// The desktop build opens the provider config file through a host-owned
+    /// operation that the web host does not implement. Intercept that action
+    /// and route it to the app's built-in config editor instead of letting the
+    /// DSH settings page show "cannot open".
+    static let configBridgeScript = """
+    (function(){
+      var labels = ['打开配置文件','Open configuration file','設定ファイルを開く','Abrir archivo de configuración','Ouvrir le fichier de configuration','Konfigurationsdatei öffnen','Открыть файл конфигурации','Abra o arquivo de configuração'];
+      document.addEventListener('click', function(e){
+        var el = e.target;
+        while (el && el !== document) {
+          if (el.tagName === 'BUTTON' || el.getAttribute && el.getAttribute('role') === 'button') break;
+          el = el.parentElement;
+        }
+        if (!el || el === document) return;
+        var text = (el.innerText || el.textContent || '').trim();
+        var hit = labels.some(function(label){ return text.indexOf(label) !== -1; });
+        if (!hit) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        try { window.webkit.messageHandlers.idsh.postMessage('openConfig'); } catch(_) {}
+      }, true);
     })();
     """
 
@@ -181,6 +224,10 @@ struct DSHWebContainer: UIViewRepresentable {
                 return
             }
             guard message.name == "idsh" else { return }
+            if let action = message.body as? String, action == "openConfig" {
+                NSLog("idsh openConfig requested from web UI")
+                NotificationCenter.default.post(name: .idshOpenConfig, object: nil)
+            }
         }
     }
 }

@@ -94,7 +94,7 @@ Docs/ISH-ENGINE-VALVES.md    引擎问题与修复记录
 
 - 只支持纯 JS / npm 插件；iOS 上无法加载 `.node` 原生 addon（node-pty、sherpa、libreoffice 等），Office 文档转换在 `--jitless` 下也不可用。
 - 冷启动仍是 50–80 秒：DSH 0.2.2 有约 95 个 Cordis 插件，iSH 是解释执行；极简模式只能省约 20%。
-- DSH 设置页的「打开配置文件」是桌面宿主专用操作，在 Web 宿主会报错；请用启动器「设置 → 配置文件」或直接添加模型提供商。添加模型不需要编辑配置文件。
+- DSH 设置页的「打开配置文件」原本是桌面宿主专属操作；iOS 宿主会把它重定向到 App 内配置编辑器。若 DSH 更新改了按钮文案导致拦截失效，仍可从启动器「设置 → 配置文件」进入。添加模型不需要编辑配置文件。
 - iPhone 只做可用性适配，不重排桌面布局；主要目标是 iPad。
 - OAuth 登录不可用；API Key 是唯一方式。
 - 未签名 IPA 需自签；免费证书 7 天有效。
@@ -189,7 +189,7 @@ Docs/ISH-ENGINE-VALVES.md    engine findings and fixes
 
 - Pure-JS/npm plugins only; `.node` native addons cannot load on iOS (node-pty, sherpa, libreoffice). Office conversion is also unavailable under `--jitless`.
 - Cold start is 50–80 s: DSH 0.2.2 loads ~95 Cordis plugins and iSH is an interpreter; minimal mode saves about 20%.
-- DSH's "open configuration file" is a desktop-host-only action and fails in the web host. Use the launcher's Settings → Configuration instead; adding a model provider does not require editing files.
+- DSH's "open configuration file" is a desktop-host-only action; the iOS host redirects it to the app's built-in config editor. If a DSH update changes the button label and breaks interception, use the launcher's Settings → Configuration. Adding a model provider does not require editing files.
 - iPhone is best-effort; the desktop layout is not reflowed. iPad is the target.
 - OAuth sign-in is unavailable; API key only.
 - The IPA is unsigned and must be sideloaded; free certificates expire after 7 days.
