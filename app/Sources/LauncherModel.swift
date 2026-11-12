@@ -251,11 +251,17 @@ final class LauncherModel: ObservableObject {
         let process = ISHShellExecutor.startPersistentExecutable(
             "/usr/bin/node",
             arguments: ["/usr/local/bin/dsh-supervisor.mjs"],
-            environment: [
-                "HOME": "/root",
-                "PATH": "/usr/local/bin:/usr/bin:/bin",
-                "DSH_FAST_MODE": fastStartup ? "1" : "0",
-            ],
+            environment: {
+                var env = [
+                    "HOME": "/root",
+                    "PATH": "/usr/local/bin:/usr/bin:/bin",
+                    "DSH_FAST_MODE": fastStartup ? "1" : "0",
+                ]
+                if let key = ProcessInfo.processInfo.environment["DEEPSEEK_API_KEY"], !key.isEmpty {
+                    env["DEEPSEEK_API_KEY"] = key
+                }
+                return env
+            }(),
             fsContext: 0,
             outputCallback: { [weak self] data, isErr in
                 guard let text = String(data: data, encoding: .utf8), !text.isEmpty else { return }

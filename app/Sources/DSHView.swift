@@ -71,6 +71,14 @@ extension Notification.Name {
     static let idshOpenConfig = Notification.Name("idsh.open.config")
 }
 
+/// Tracks the web view SwiftUI is currently showing. The full-screen cover
+/// can recreate its hosting controller; the eval bridge must follow the live
+/// view rather than a coordinator that belonged to a replaced one.
+@MainActor
+enum DSHWebRegistry {
+    static weak var view: WKWebView?
+}
+
 struct DSHWebContainer: UIViewRepresentable {
     let url: URL
 
@@ -102,6 +110,7 @@ struct DSHWebContainer: UIViewRepresentable {
         view.isOpaque = false
         view.backgroundColor = .black
         context.coordinator.webView = view
+        DSHWebRegistry.view = view
         context.coordinator.registerEvalObserver()
         view.load(URLRequest(url: url))
         return view
@@ -174,7 +183,7 @@ struct DSHWebContainer: UIViewRepresentable {
         /// live DSH page without holding a reference to the web view.
         func registerEvalObserver() {
             observer = NotificationCenter.default.addObserver(forName: .idshEval, object: nil, queue: .main) { [weak self] note in
-                guard let js = note.object as? String, let webView = self?.webView else { return }
+                guard let js = note.object as? String, let webView = DSHWebRegistry.view else { return }
                 webView.evaluateJavaScript(js) { value, error in
                     let text: String
                     if let error {
