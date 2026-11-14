@@ -206,5 +206,21 @@ process.on('SIGINT', () => { stopping = true; child?.kill('SIGTERM'); process.ex
 process.on('uncaughtException', (e) => { log(`uncaught: ${e && (e.stack || e.message || e)}`); });
 process.on('unhandledRejection', (e) => { log(`unhandled rejection: ${e && (e.stack || e.message || e)}`); });
 
+// dshmarket's server-side catalog fetch imports undici directly. In this
+// jitless guest undici's wasm llhttp is unavailable ("llhttp_alloc"), so every
+// catalog request fails. The market only needs JSON here; route it through the
+// host's global fetch polyfill, which is the stack that already works.
+function patchMarketFetch() {
+  const p = '/root/.dsh/profiles/web/node_modules/dshmarket/lib/net.js';
+  try {
+    let s = readFileSync(p, 'utf8');
+    if (!s.includes('await undiciFetch(')) return;
+    writeFileSync(p + '.bak', s);
+    writeFileSync(p, s.split('await undiciFetch(').join('await globalThis.fetch('));
+    log('dshmarket: catalog fetch -> globalThis.fetch');
+  } catch {}
+}
+
+patchMarketFetch();
 start().catch((e) => { log(`initial start failed: ${e.message}`); scheduleRestart(30_000); });
 setInterval(() => { health().catch((e) => log(`health threw: ${e && (e.stack || e.message)}`)); }, HEALTH_MS).unref();

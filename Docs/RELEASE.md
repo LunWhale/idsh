@@ -1,5 +1,15 @@
 # idsh 构建与侧载说明
 
+## v0.1.5（2026-11-14）
+
+修复 dshmarket 插件市场目录：`dsh-supervisor.mjs` 在每次启动前把
+`dshmarket/lib/net.js` 的 undici 目录请求改为宿主全局 fetch（iSH 的
+`--jitless` 环境缺少 undici 的 wasm llhttp）。iPad / iPhone 模拟器实测
+「插件 → 插件市场」可加载 11k 条目。RootfsPatch v9。
+
+- 未签名 IPA：`dist/idsh-unsigned.ipa`，291 MB
+- sha256：`35a786fc427410cdbf2c6b5d7aa0579eacd61a5888ee7982f0871867e27fbd85`
+
 ## v0.1.4（2026-11-14）
 
 设备 slice 也换用新 ish-arm64 引擎并保留 futex/poll 阀门修复，与模拟器 slice 一致；iOS 26.3 iPhone 17 Pro 模拟器实测 DSH 启动、模型列表、真实 API 对话与 95 秒后台存活均正常。IPA 仍为未签名。
