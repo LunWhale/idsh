@@ -249,13 +249,15 @@ final class LauncherModel: ObservableObject {
         supervisorProcess?.terminate()
         var pending = ""
         let process = ISHShellExecutor.startPersistentExecutable(
-            "/usr/bin/node",
+            "/usr/local/bin/dsh-node",
             arguments: ["/usr/local/bin/dsh-supervisor.mjs"],
             environment: {
                 var env = [
                     "HOME": "/root",
                     "PATH": "/usr/local/bin:/usr/bin:/bin",
                     "DSH_FAST_MODE": fastStartup ? "1" : "0",
+                    "NODE_EXTRA_CA_CERTS": "/etc/ssl/cert.pem",
+                    "SSL_CERT_FILE": "/etc/ssl/cert.pem",
                 ]
                 if let key = ProcessInfo.processInfo.environment["DEEPSEEK_API_KEY"], !key.isEmpty {
                     env["DEEPSEEK_API_KEY"] = key

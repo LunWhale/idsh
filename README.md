@@ -16,7 +16,7 @@
 
 `idsh` 把完整的 DeepSeek Harness 装进 iPad：iSH ARM64 用户态 Linux + 常驻 `dsh web` + WKWebView。它不是远程串流，也不是精简版客户端——浏览器里加载的就是桌面版 DSH 的同一套前端，iPad 上得到三栏桌面布局。
 
-> ⚠️ **加载速度极慢。** 首次启动要解压约 1.1 GB 的 Alpine rootfs（2–3 分钟）；之后冷启动仍要 50–80 秒，极简模式约 69–77 秒。这不是 bug，是 iSH 解释执行 + DSH 0.2.2 约 95 个 Cordis 插件的固有成本。
+> ⚠️ **加载速度极慢。** 首次启动要解压约 1.1 GB 的 Debian rootfs（2–3 分钟）；之后冷启动仍要 50–80 秒，极简模式约 69–77 秒。这不是 bug，是 iSH 解释执行 + Debian/glibc Node 24 + DSH 0.2.2 约 95 个 Cordis 插件的固有成本。
 
 ### 已实现
 
@@ -35,7 +35,7 @@
 
 1. 从 [Releases](https://github.com/LunWhale/idsh/releases) 下载 `idsh-unsigned.ipa`。
 2. 用 SideStore / AltStore / Sideloadly 自签安装（免费 Apple ID 7 天；付费账号可 1 年 Ad Hoc）。
-3. 首次启动解压约 1.1 GB Alpine rootfs，约 2–3 分钟；之后冷启动约 50–80 秒。
+3. 首次启动解压约 1.1 GB Debian rootfs，约 2–3 分钟；之后冷启动约 50–80 秒。
 4. 进入 DSH 后添加 DeepSeek API Key。
 
 > 未签名 IPA 不能在未越狱设备上直接安装，也不要用 TrollStore（iOS 26 已不支持）。
@@ -67,7 +67,7 @@ bash scripts/make-ipa.sh
 
 ```text
 SwiftUI 启动器
- ├─ ISHRootfsInstaller   解压 Alpine fakefs（ZIP64）
+ ├─ ISHRootfsInstaller   解压 Debian fakefs（ZIP64）
  ├─ ISHKernel            iSH ARM64 内核 + fakefs + 网络
  ├─ dsh-supervisor.mjs   常驻 dsh web :8790，写 /tmp/dsh.url
  ├─ WKWebView            加载 dsh-web-frontend（PC 同款）
@@ -113,7 +113,7 @@ GPL-3.0。原因：链接了 iSH / ish-arm64 / OpenMinis 的 GPL 代码。第三
 
 `idsh` puts the full DeepSeek Harness on an iPad: an iSH ARM64 user-mode Linux, a long-running `dsh web`, and a WKWebView. It is not remote streaming and not a cut-down client — the WebView loads the same frontend as the desktop app, so the iPad gets the real three-column layout.
 
-> ⚠️ **Startup is extremely slow.** The first launch extracts a ~1.1 GB Alpine rootfs (2–3 min); later cold starts still take 50–80 s, or 69–77 s in minimal mode. This is not a bug: iSH interprets every instruction, and DSH 0.2.2 loads about 95 Cordis plugins.
+> ⚠️ **Startup is extremely slow.** The first launch extracts a ~1.1 GB Debian rootfs (2–3 min); later cold starts still take 50–80 s, or 69–77 s in minimal mode. This is not a bug: iSH interprets every instruction, and DSH 0.2.2 loads about 95 Cordis plugins.
 
 ### What works
 
@@ -132,7 +132,7 @@ GPL-3.0。原因：链接了 iSH / ish-arm64 / OpenMinis 的 GPL 代码。第三
 
 1. Download `idsh-unsigned.ipa` from [Releases](https://github.com/LunWhale/idsh/releases).
 2. Sideload with SideStore / AltStore / Sideloadly (free Apple ID: 7 days; paid: 1-year Ad Hoc).
-3. First launch extracts a ~1.1 GB Alpine rootfs (2–3 min); later cold starts take 50–80 s.
+3. First launch extracts a ~1.1 GB Debian rootfs (2–3 min); later cold starts take 50–80 s.
 4. Add a DeepSeek API key inside DSH.
 
 ### Startup modes
@@ -162,7 +162,7 @@ The repository ships `app/Vendor/HarnessISH.xcframework` (our engine build with 
 
 ```text
 SwiftUI launcher
- ├─ ISHRootfsInstaller   extracts the Alpine fakefs (ZIP64)
+ ├─ ISHRootfsInstaller   extracts the Debian fakefs (ZIP64)
  ├─ ISHKernel            iSH ARM64 kernel + fakefs + networking
  ├─ dsh-supervisor.mjs   keeps dsh web on :8790 and writes /tmp/dsh.url
  ├─ WKWebView            loads dsh-web-frontend (same as desktop)

@@ -16,3 +16,6 @@ DerivedData/
 build/
 *.xcuserstate
 xcuserdata/
+
+.build/
+app/Vendor/HarnessISH.xcframework.prev2/

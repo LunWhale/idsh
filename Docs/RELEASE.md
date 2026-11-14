@@ -1,5 +1,10 @@
 # idsh 构建与侧载说明
 
+## v0.1.3（2026-11-14）
+
+改用 Debian 13 + glibc Node 24.11.1 rootfs，修复 DSH 0.2.2 首次聊天触发 iSH 引擎 SIGILL 的问题；同时启用 TLS 1.2（iSH fakefs 下 TLS 1.3 会 bad record mac）与 TCP DNS（`options use-vc`）。首次启动解压/冷启动时间与 v0.1.2 接近。
+
+
 ## v0.1.2（2026-11-12）
 
 新增：DSH 设置页的「打开配置文件」在 iOS 宿主重定向到 App 内配置编辑器，不再报“无法打开配置文件”。
@@ -10,7 +15,7 @@
 
 ## 产物
 
-- `dist/idsh-unsigned.ipa`（约 341 MB，未签名，sha256 `4e38e4ef8b48593b1bcc066f11ac468d8b657583b2a0ad4caf61510f868fd7a3`）
+- `dist/idsh-unsigned.ipa`（约 278 MB，未签名，sha256 `7c56e244f6d365007678b99a2646024b00c5c738c04b2b247f254ff3b8983bac`）
 - 构建脚本：`scripts/make-ipa.sh`
 - 目标：iPad Pro 11-inch (M4)，最低 iOS 18.0；已在 iPadOS 26.3 模拟器验证
 
@@ -24,7 +29,7 @@ bash scripts/make-ipa.sh
 依赖：
 
 - Xcode 26.2（iOS SDK 26.2）
-- `app/Resources/alpine-rootfs.zip`（Alpine 3.21 + Node 22.23.4 + DSH 0.2.2-rc.1 + pnpm shim）
+- `app/Resources/alpine-rootfs.zip`（Debian 13 + Node 24.11.1 + DSH 0.2.2-rc.1 + npm/pnpm shim）
 - `app/Vendor/HarnessISH.xcframework`（引擎已移除 futex/poll 空闲自杀阀）
 
 ## 签名与安装

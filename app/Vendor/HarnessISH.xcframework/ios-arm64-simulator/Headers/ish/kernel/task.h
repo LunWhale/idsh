@@ -125,6 +125,15 @@ struct task {
     pid_t native_pid;
     bool is_native_proxy;
 
+    // [T-ish-offload-signal-forward] Set while this task is executing an
+    // IN-PROCESS offload handler (native_offload_add_handler). Distinct from
+    // is_native_proxy, which covers only the posix_spawn shape: a handler runs
+    // on this very thread with no host pid, so a signal can't be forwarded with
+    // kill() — it has to go through the handler's abort callback instead.
+    // Points into the static offload registry, which lives for the process
+    // lifetime, so it never dangles. NULL when not in a handler.
+    void *native_offload_entry;
+
     // current condition/lock, so it can be notified in case of a signal
     cond_t *waiting_cond;
     lock_t *waiting_lock;
@@ -253,6 +262,14 @@ extern void (*exit_hook)(struct task *task, int code);
 
 typedef int (*ish_timer_tick_hook_t)(void);
 void ish_set_timer_tick_hook(ish_timer_tick_hook_t hook);
+
+// [fork-guard] Called in sys_clone before a new task is created.
+// Return 0 to allow the fork, or a negative errno (e.g. _EAGAIN) to deny it;
+// the value is returned to the guest verbatim and no task is created.
+// Set with ish_set_fork_guard(); pass NULL to remove. Thread-safe via atomic store.
+// The callback runs on the forking thread and must not allocate or take kernel locks.
+typedef int (*ish_fork_guard_t)(void);
+void ish_set_fork_guard(ish_fork_guard_t guard);
 
 #define superuser() (current != NULL && current->euid == 0)
 

@@ -52,7 +52,7 @@ enum ISHRootfsError: LocalizedError, Sendable {
 actor ISHRootfsInstaller {
     static let shared = ISHRootfsInstaller()
 
-    private static let installationVersion = "idsh-alpine-3.21.0-aarch64-5"
+    private static let installationVersion = "idsh-debian-13.7-node24-3"
     private static let archivePrefix = "alpine-rootfs/"
     private static let maximumEntries = 300_000
     private static let maximumExpandedBytes = 2_048 * 1_024 * 1_024
