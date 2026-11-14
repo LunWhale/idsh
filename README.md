@@ -35,6 +35,7 @@
 
 1. 从 [Releases](https://github.com/LunWhale/idsh/releases) 下载 `idsh-unsigned.ipa`。
 2. 用 SideStore / AltStore / Sideloadly 自签安装（免费 Apple ID 7 天；付费账号可 1 年 Ad Hoc）。
+   也可运行 `scripts/sign-device.sh` 走免费个人团队签名；首次会弹钥匙串授权，输入登录密码并点「始终允许」。免费签名不含 App Group，分享面板会失效。
 3. 首次启动解压约 1.1 GB Debian rootfs，约 2–3 分钟；之后冷启动约 50–80 秒。
 4. 进入 DSH 后添加 DeepSeek API Key。
 
