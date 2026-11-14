@@ -1,5 +1,10 @@
 # idsh 构建与侧载说明
 
+## v0.1.4（2026-11-14）
+
+设备 slice 也换用新 ish-arm64 引擎并保留 futex/poll 阀门修复，与模拟器 slice 一致；iOS 26.3 iPhone 17 Pro 模拟器实测 DSH 启动、模型列表、真实 API 对话与 95 秒后台存活均正常。IPA 仍为未签名。
+
+
 ## v0.1.3（2026-11-14）
 
 改用 Debian 13 + glibc Node 24.11.1 rootfs，修复 DSH 0.2.2 首次聊天触发 iSH 引擎 SIGILL 的问题；同时启用 TLS 1.2（iSH fakefs 下 TLS 1.3 会 bad record mac）与 TCP DNS（`options use-vc`）。首次启动解压/冷启动时间与 v0.1.2 接近。
@@ -15,7 +20,7 @@
 
 ## 产物
 
-- `dist/idsh-unsigned.ipa`（约 278 MB，未签名，sha256 `7c56e244f6d365007678b99a2646024b00c5c738c04b2b247f254ff3b8983bac`）
+- `dist/idsh-unsigned.ipa`（约 291 MB，未签名，sha256 `3aa47c77811e0c905d63959da4e351bbe7a8d0d98b34ce2d9d086d4c4b5937af`）
 - 构建脚本：`scripts/make-ipa.sh`
 - 目标：iPad Pro 11-inch (M4)，最低 iOS 18.0；已在 iPadOS 26.3 模拟器验证
 

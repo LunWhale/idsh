@@ -63,6 +63,37 @@ typedef int (*native_handler_func)(int argc, char **argv,
 // Returns 0 on success, -1 if registry is full.
 int native_offload_add_handler(const char *guest_name, native_handler_func handler);
 
+// [T-ish-offload-signal-forward] Abort callback for an in-process handler.
+//
+// WHY THIS EXISTS: a handler runs synchronously on the guest thread and
+// `exec_handler` only calls do_exit() once it returns. A handler that never
+// returns (ffmpeg wedged inside a VideoToolbox transcode is the reported case)
+// therefore pins the guest task in the process table forever, and `kill -9`
+// silently does nothing: send_signal queues the signal and cpu_poke()s a thread
+// that is not in the CPU loop to see it.
+//
+// Signals cannot be delivered *to* such a handler from outside — do_exit()
+// operates on the thread-local `current` and ends in pthread_exit(), so only
+// the task's own thread can reap it. The only workable shape is to ask the
+// handler to stop waiting and return, which is what this callback does.
+//
+// Contract for implementors:
+//   - Called from the SIGNALLING thread, not the handler's own thread, while
+//     the handler is still running. It must be async-safe with respect to the
+//     handler body: signal an event, do not take a lock the handler holds.
+//   - Returns true if the handler will now wind down, false if it cannot be
+//     aborted (the signal then falls through to normal guest delivery).
+//   - The handler is expected to return "soon" after this; whatever host work
+//     it had started may keep running. Abandoning that work is the caller's
+//     accepted cost, and the handler should say so in the log.
+typedef bool (*native_abort_func)(int sig);
+
+// Attach an abort callback to an already-registered in-process handler.
+// Returns 0 on success, -1 if `guest_name` has no handler registered.
+// Optional: a handler without one simply cannot be interrupted, which is the
+// pre-existing behaviour for every offload.
+int native_offload_set_abort_handler(const char *guest_name, native_abort_func abort_fn);
+
 // Register a host binary offload (macOS CLI only, uses posix_spawn).
 // spec is "name" or "name=/host/path". Returns 0 on success.
 int native_offload_add(const char *spec);
@@ -79,8 +110,15 @@ int native_offload_exec(const char *native_path,
                         size_t argc, const char *argv,
                         const char *envp);
 
-// Forward a signal to the native process backing a proxy task.
-// Returns true if the signal was forwarded.
+// Forward a signal to the native work backing a task, covering BOTH offload
+// shapes:
+//   - posix_spawn proxy tasks  -> kill(native_pid, ...)
+//   - in-process handler tasks -> the handler's registered abort callback
+// Returns true if the signal was consumed by one of those paths.
+//
+// [T-ish-offload-signal-forward] The handler branch is the addition. Before it,
+// this returned false for every in-process handler, so `kill` on a wedged
+// ffmpeg queued a signal nobody would ever read.
 bool native_offload_forward_signal(struct task *task, int sig);
 
 // ============================================================================
