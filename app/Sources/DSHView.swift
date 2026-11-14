@@ -12,7 +12,6 @@ struct DSHView: View {
             Color.black.ignoresSafeArea()
             if let url {
                 DSHWebContainer(url: url)
-                    .ignoresSafeArea()
             } else {
                 ProgressView("等待 DSH URL").tint(.white).foregroundStyle(.white)
             }
@@ -39,7 +38,9 @@ struct DSHView: View {
             }
         }
         .statusBarHidden(false)
-        .sheet(isPresented: $model.showShareComposer) {
+        .sheet(isPresented: $model.showShareComposer, onDismiss: {
+            if model.pendingShare != nil { model.cancelShare() }
+        }) {
             if let batch = model.pendingShare {
                 ShareComposerView(batch: batch).environmentObject(model)
             }
@@ -131,22 +132,72 @@ struct DSHWebContainer: UIViewRepresentable {
     /// asks for, so text renders on runtimes without PingFang (simulators).
     static let fontScript = """
     (function(){
-      var face="@font-face{font-family:'PingFang SC';src:url('idsh-font://cjk/STHeitiSC-Medium.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:swap;}@font-face{font-family:'PingFang TC';src:url('idsh-font://cjk/STHeitiSC-Medium.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:swap;}@font-face{font-family:'Hiragino Sans GB';src:url('idsh-font://cjk/STHeitiSC-Medium.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:swap;}";
+      var face="@font-face{font-family:'PingFang SC';src:url('idsh-font://cjk/STHeitiSC-Medium.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:block;}@font-face{font-family:'PingFang TC';src:url('idsh-font://cjk/STHeitiSC-Medium.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:block;}@font-face{font-family:'Hiragino Sans GB';src:url('idsh-font://cjk/STHeitiSC-Medium.woff2') format('woff2');font-weight:100 900;font-style:normal;font-display:block;}html body :where(button,span,div,p,a,label,li,h1,h2,h3,h4,h5,h6,td,th,input,textarea){font-family:'PingFang SC','Hiragino Sans GB',sans-serif !important;}code,pre,kbd,samp{font-family:ui-monospace,Menlo,monospace !important;}";
       function add(root){
-        if(!root || root.__idshFont) return;
-        root.__idshFont=1;
+        if(!root) return;
+        var host = (root.head || (root.nodeType===9 ? document.head : root));
+        if(!host) { setTimeout(function(){ add(root); }, 50); return; }
+        if(document.getElementById('idsh-font-face')) return;
         var s=document.createElement('style');
+        s.id='idsh-font-face';
         s.textContent=face;
-        (root.head||root).appendChild(s);
+        host.appendChild(s);
+      }
+      function fixText(root){
+        if(!root || !root.querySelectorAll) return;
+        var all=root.querySelectorAll('*');
+        for(var i=0;i<all.length;i++){
+          var el=all[i];
+          if(el.__idshCjk) continue;
+          var hit=false;
+          for(var c=0;c<el.childNodes.length;c++){
+            var n=el.childNodes[c];
+            if(n.nodeType===3 && n.nodeValue && /[\\u3400-\\u9fff]/.test(n.nodeValue)){ hit=true; break; }
+          }
+          if(!hit && !el.children.length && el.textContent && /[\\u3400-\\u9fff]/.test(el.textContent)) hit=true;
+          if(hit){
+            el.__idshCjk=1;
+            el.style.fontFamily="'PingFang SC','Hiragino Sans GB',sans-serif";
+          }
+        }
+        if(root.nodeType===1 && !root.__idshCjk && root.textContent && /[\\u3400-\\u9fff]/.test(root.textContent)){
+          var direct=false;
+          for(var c2=0;c2<root.childNodes.length;c2++){var n2=root.childNodes[c2];if(n2.nodeType===3&&n2.nodeValue&&/[\\u3400-\\u9fff]/.test(n2.nodeValue)){direct=true;break;}}
+          if(direct){root.__idshCjk=1;root.style.fontFamily="'PingFang SC','Hiragino Sans GB',sans-serif";}
+        }
       }
       function scan(root){
         add(root);
+        fixText(root);
         var all = root.querySelectorAll ? root.querySelectorAll('*') : [];
-        for (var i = 0; i < all.length; i++) { if (all[i].shadowRoot) add(all[i].shadowRoot); }
+        for (var i = 0; i < all.length; i++) { if (all[i].shadowRoot) { add(all[i].shadowRoot); fixText(all[i].shadowRoot); } }
+      }
+      function visit(n){
+        if(!n) return;
+        if(n.nodeType===3) n=n.parentElement;
+        if(!n || n.nodeType!==1) return;
+        scan(n);
       }
       scan(document);
       window.addEventListener('load', function(){ scan(document); });
-      setTimeout(function(){ scan(document); }, 1500);
+      setTimeout(function(){ scan(document); }, 1200);
+      setTimeout(function(){ scan(document); }, 3000);
+      setTimeout(function(){ scan(document); }, 6000);
+      try {
+        var pending=false;
+        new MutationObserver(function(ms){
+          if(pending) return;
+          pending=true;
+          setTimeout(function(){
+            pending=false;
+            for(var i=0;i<ms.length;i++){
+              var m=ms[i];
+              if(m.type==='characterData') visit(m.target);
+              else for(var j=0;j<m.addedNodes.length;j++) visit(m.addedNodes[j]);
+            }
+          }, 250);
+        }).observe(document,{childList:true,subtree:true,characterData:true});
+      } catch(_) {}
     })();
     """
 

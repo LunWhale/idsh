@@ -75,6 +75,12 @@ enum ShareInbox {
         try? save(batch)
     }
 
+    static func markCancelled(_ id: String) {
+        guard var batch = loadBatches().first(where: { $0.id == id }) else { return }
+        batch.status = "cancelled"
+        try? save(batch)
+    }
+
     static func itemURL(_ item: Item, in batchID: String) -> URL? {
         batchURL(batchID)?.appendingPathComponent(item.relativePath)
     }

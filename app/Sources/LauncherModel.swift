@@ -262,6 +262,14 @@ final class LauncherModel: ObservableObject {
                 if let key = ProcessInfo.processInfo.environment["DEEPSEEK_API_KEY"], !key.isEmpty {
                     env["DEEPSEEK_API_KEY"] = key
                 }
+                // Tested providers used by the desktop profile. Only keys explicitly
+                // passed by the launcher are forwarded; secrets never come from the bundle.
+                for name in ["UNCENSORED_API_KEY", "AUTO_NEW_API_KEY", "RJK66_BACKUP_API_KEY",
+                             "NITIAN_API_KEY", "OPENCODE_GO_API_KEY", "OPENCODE_API_KEY"] {
+                    if let value = ProcessInfo.processInfo.environment[name], !value.isEmpty {
+                        env[name] = value
+                    }
+                }
                 return env
             }(),
             fsContext: 0,
@@ -274,7 +282,13 @@ final class LauncherModel: ObservableObject {
                     let lines = pending.split(separator: "\n", omittingEmptySubsequences: false)
                     if lines.count > 1 {
                         pending = String(lines.last ?? "")
-                        if let last = lines.dropLast().last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }) {
+                        let visible = lines.dropLast().filter {
+                            let line = $0.trimmingCharacters(in: .whitespaces)
+                            // iSH injects LD_PRELOAD=/lib/zero_free.so for any binary named "node".
+                            // Debian has no such hook; glibc warns once and continues. Keep it out of the launcher.
+                            return !line.isEmpty && !line.contains("LD_PRELOAD cannot be preloaded")
+                        }
+                        if let last = visible.last {
                             self.detail = String(last).prefix(300).description
                             try? String(last).write(to: self.supervisorLog, atomically: true, encoding: .utf8)
                         }
@@ -601,6 +615,17 @@ final class LauncherModel: ObservableObject {
         if rc < 0 {
             shareNotice = "无法挂载 /workspace，分享文件将只留在 App 内"
         }
+    }
+
+    /// Dismissing the share sheet must not leave the batch pending, otherwise
+    /// the next launch resurfaces the same sheet (observed in testing).
+    func cancelShare() {
+        if let batch = pendingShare {
+            ShareInbox.markCancelled(batch.id)
+        }
+        pendingShare = nil
+        pendingShareBatchID = nil
+        showShareComposer = false
     }
 
     func deliverShare(_ batch: ShareInbox.Batch, mode: ShareDeliveryMode) {

@@ -38,7 +38,6 @@ struct RootView: View {
         .fullScreenCover(isPresented: $model.showDSH) {
             DSHView(url: model.serverURL)
                 .environmentObject(model)
-                .ignoresSafeArea()
         }
         .sheet(isPresented: $model.showTerminal) {
             TerminalConsole()
@@ -48,7 +47,9 @@ struct RootView: View {
         .sheet(isPresented: $model.showPlugins) {
             PluginsView().environmentObject(model)
         }
-        .sheet(isPresented: $model.showShareComposer) {
+        .sheet(isPresented: $model.showShareComposer, onDismiss: {
+            if model.pendingShare != nil { model.cancelShare() }
+        }) {
             if let batch = model.pendingShare {
                 ShareComposerView(batch: batch).environmentObject(model)
             }
@@ -111,7 +112,9 @@ struct LauncherView: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 2)
 
-            Text("Alpine 3.21 · Node 22 · DSH 0.2.2-rc.1")
+            // The guest rootfs is Debian 13 + glibc Node 24 since v0.1.3.
+            // The archive still keeps its historical "alpine-rootfs.zip" name.
+            Text("Debian 13 · Node 24 · DSH \(model.dshVersion == "—" ? "0.2.2-rc.1" : model.dshVersion)")
                 .font(.system(size: 12, design: .monospaced))
                 .foregroundStyle(Color(white: 0.45))
                 .padding(.top, 10)
